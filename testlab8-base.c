@@ -1,4 +1,5 @@
 #include "testLab.h"
+#include "testlab8-base.h"
 #include <inttypes.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -11,17 +12,22 @@
 enum { MAX_VERTEX_COUNT = 5000 };
 
 static unsigned TestcaseIdx = 0;
+static const unsigned TestcaseCount = 35;
 
 static int Feed(void);
 static int Check(void);
 
 TLabTest GetLabTest(int testIdx) {
-    (void)testIdx;
-    TLabTest labTest = {Feed, Check};
-    return labTest;
+    if (testIdx == 4) {
+        TLabTest labtest = { SpecialFeed, Check };
+    } else if (testIdx==TestcaseCount) {
+        TLabTest labtest = { SpecialFeed2, Check };
+    } else {
+        TLabTest labtest = { Feed, Check };
+    }
+    return labtest;
 }
 
-static const unsigned TestcaseCount = 33;
 int GetTestCount(void) {
     return TestcaseCount;
 }
@@ -39,18 +45,6 @@ static size_t LabMemoryLimit = MIN_PROCESS_RSS_BYTES;
 size_t GetTestMemoryLimit(void) {
     return LabMemoryLimit;
 }
-
-struct TEdge {
-    unsigned Begin;
-    unsigned End;
-    unsigned long long Length;
-};
-
-typedef union {
-    struct TEdge Edge;
-    unsigned long long Integer;
-    const char* String;
-} TTestcaseData;
 
 static TTestcaseData MakeInteger(unsigned long long integer) {
     TTestcaseData testcaseData;
@@ -80,17 +74,6 @@ static void CalcRowColumn(unsigned linearIdx, unsigned* rowIdx, unsigned* column
     *rowIdx = (unsigned)(sqrt(8 * linearIdx + 1) / 2 - 0.5);
     *columnIdx = linearIdx - SumRange(0, *rowIdx);
 }
-
-enum { IGNORED_VERTEX_IDX = 0 };
-static const unsigned IGNORED_EDGE_IDX = (unsigned)-1;
-
-enum ETestcaseDataId {
-    VERTEX_COUNT,
-    EDGE_COUNT,
-    EDGE,
-    ERROR_MESSAGE,
-    MST_LENGTH
-};
 
 static TTestcaseData GetFromTestcase(unsigned testcaseIdx, enum ETestcaseDataId dataId, unsigned edgeIdx) {
     const unsigned smallTestCount = 30;
@@ -229,6 +212,8 @@ static TTestcaseData GetFromTestcase(unsigned testcaseIdx, enum ETestcaseDataId 
             default:
                 abort();
         }
+    } else if (testcaseIdx == smallTestCount + 4) {
+        return Lab8SpecialTest(dataId, edgeIdx);
     } else {
         abort();
     }
@@ -343,7 +328,11 @@ static int Check(void) {
         }
     } else { // test spanning tree
         const unsigned vertexCount = GetVertexCount();
-        unsigned vertexParent[MAX_VERTEX_COUNT];
+        unsigned* vertexParent = (unsigned*)malloc(vertexCount * sizeof(int));
+        if (vertexParent == NULL) {
+            printf("malloc returned NULL -- please free ram and re-run tests\n");
+            return 1; // test failed
+        }
         unsigned long long length = 0;
         InitParent(vertexCount, vertexParent);
         for (unsigned idx = 0; idx + 1 < vertexCount; ++idx) {
@@ -374,6 +363,7 @@ static int Check(void) {
                 status = Fail;
             }
         }
+        free(vertexParent);
     }
     if (status == Pass && HaveGarbageAtTheEnd(out)) {
         status = Fail;
